@@ -1,4 +1,6 @@
 import random
+import json
+import os
 from dataclasses import dataclass
 from typing import List, Dict
 
@@ -39,7 +41,7 @@ class Student:
     def __init__(self):
         # Варианты для игры "камень-ножницы-бумага"
         self.choices = ["камень", "ножницы", "бумага"]
-        
+
         # Список блюд в столовой (каждое блюдо - артефакт)
         self.food_items = [
             Artifact("Пирожок", "", "Вкусный пирожок для подкрепления сил", 20),
@@ -53,13 +55,20 @@ class Student:
 
 # Класс Player представляет игрока и его состояние
 class Player:
-    def __init__(self):
+    def __init__(self, username: str = ""):
+        self.username = username  # Имя пользователя
         self.artifacts: List[Artifact] = []  # Список собранных артефактов
         self.visited_locations: List[str] = []  # Список посещенных локаций
         self.has_pen = False  # Флаг наличия ручки (пока не используется)
         self.prepared_tickets = []  # Список подготовленных билетов
         self.special_artifacts_found = 0  # Количество найденных особых артефактов
-    
+        
+        # Добавленные поля для совместимости с классом Game
+        self.reputation = 50  # Начальная репутация
+        self.lives = 3  # Количество попыток на пересдачу
+        self.scholarship = True  # Сохранена ли стипендия
+        self.exams = {}  # Словарь с результатами экзаменов
+
     def add_artifact(self, artifact: Artifact):
         # Добавляет артефакт в коллекцию игрока
         self.artifacts.append(artifact)
@@ -76,6 +85,53 @@ class Player:
     def special_artifact(self, artifact_name: str) -> bool:
         # Проверяет, есть ли у игрока конкретный артефакт
         return any(artifact.name == artifact_name for artifact in self.artifacts)
+    
+    # Добавленные методы для совместимости с классом Game
+    def check_scholarship(self) -> bool:
+        """Проверяет, сохранена ли стипендия"""
+        return self.scholarship
+    
+    def to_dict(self):
+        """Преобразует объект игрока в словарь для сохранения"""
+        return {
+            'username': self.username,
+            'reputation': self.reputation,
+            'lives': self.lives,
+            'scholarship': self.scholarship,
+            'exams': self.exams,
+            'artifacts': [
+                {
+                    'name': artifact.name,
+                    'emoji': artifact.emoji,
+                    'description': artifact.description,
+                    'power': artifact.power,
+                    'special_for_exam': artifact.special_for_exam
+                }
+                for artifact in self.artifacts
+            ]
+        }
+    
+    @classmethod
+    def from_dict(cls, data: dict):
+        """Создает объект игрока из словаря"""
+        player = cls(data.get('username', ''))
+        player.reputation = data.get('reputation', 50)
+        player.lives = data.get('lives', 3)
+        player.scholarship = data.get('scholarship', True)
+        player.exams = data.get('exams', {})
+        
+        # Восстанавливаем артефакты
+        for artifact_data in data.get('artifacts', []):
+            artifact = Artifact(
+                name=artifact_data['name'],
+                emoji=artifact_data['emoji'],
+                description=artifact_data['description'],
+                power=artifact_data['power'],
+                special_for_exam=artifact_data['special_for_exam']
+            )
+            player.artifacts.append(artifact)
+        
+        return player
 
 
 # Основной класс игры, управляющий всей игровой логикой
@@ -85,7 +141,7 @@ class AdventureGame:
         self.game_active = True  # Флаг активности игры
         self.locations = self.static()  # Инициализируем локации
         self.student = Student()  # Создаем объект студента
-        
+
         # Список возможных кабинетов для задания преподавателя
         self.classrooms = ["501", "502", "503", "504", "505", "506"]
         # Случайно выбираем целевой кабинет
@@ -100,7 +156,7 @@ class AdventureGame:
             Artifact("Учебник", "📚", "Вся теория в одной книге", 60, True),
             Artifact("Калькулятор", "🧮", "Решает любые пределы и интегралы", 55, True),
         ]
-        
+
         # Обычные артефакты в коридоре
         self.hallway_artifacts = [
             Artifact("Забытая тетрадь", "📓", "Чьи-то конспекты", 15, False),
@@ -110,7 +166,7 @@ class AdventureGame:
         self.exam_tickets = list(range(1, 11))
         # Игрок заранее подготовлен к 3 случайным билетам
         self.player.prepared_tickets = random.sample(self.exam_tickets, 3)
-        
+
         # Случайное количество особых артефактов в коридоре (1 или 2)
         self.special_in_hallway = random.randint(1, 2)
 
@@ -165,7 +221,7 @@ class AdventureGame:
         pen = Artifact("Ручка", "✍️", "Самая база для любого экзамена", 5)
         self.player.add_artifact(pen)
         print(f"Вы получаете артефакт: {pen} — '{pen.description}'")
-        
+
         # Переходим к поиску в коридоре
         self.search_hallway()
 
@@ -195,7 +251,7 @@ class AdventureGame:
             print("К сожалению, вы ничего не нашли. Коридор пуст.")
         else:
             print(f"🎒 Теперь у вас {len(found_artifacts)} предметов!")
-        
+
         # Переходим в коридор для выбора пути
         self.hallway()
 
@@ -385,7 +441,7 @@ class AdventureGame:
 
     def ask_alina(self):
         # Способ списывания: попросить помощи у отличницы (всегда провальный)
-        print("\n👩‍🎓 Вы шепотом просите помощи у отличницы Алины...")
+        print("\n👩‍🎓 Вы шепотом просите помощи у отличница Алины...")
         print("Алина поворачивается и ГРОМКО говорит:")
         print("'Извините, профессор, он просит меня подсказать!'")
         print("Алина сдала вас! Преподаватель разозлился.")
@@ -395,7 +451,7 @@ class AdventureGame:
     def exam_success(self):
         # Метод для обработки успешной сдачи экзамена
         print("\n🎉 ПОЗДРАВЛЯЕМ! Вы успешно сдали экзамен по матану!")
-        
+
         # Проверяем, собрал ли игрок много особых артефактов
         special_count = self.player.special_artifacts_found
         if special_count >= 2:
@@ -591,7 +647,7 @@ class AdventureGame:
         else:
             # Если опоздали
             print("⏰ Вы опоздали на экзамен!")
-        
+
         self.end_game()  # Завершаем игру
 
     def tiebreaker_round(self):
@@ -651,7 +707,7 @@ class AdventureGame:
 
             if choice == "да":
                 self.reset_game()  # Сбрасываем игру
-                self.start()      # Начинаем новую игру
+                self.start()  # Начинаем новую игру
                 break
             elif choice == "нет":
                 print("Спасибо за игру! Удачи в учебе!")
@@ -674,30 +730,282 @@ class AdventureGame:
             loc.visited = False
 
 
-def main():
-    # Основная функция запуска игры
-    print("-" * 20)
-    print("СТУДЕНЧЕСКАЯ ЖИЗНЬ")
-    print("-" * 20)
-    print("Соберите особые артефакты в коридоре!")
+class ArtifactVault:
+    """Класс для хранения артефактов"""
+    def __init__(self):
+        self.vault = []
+    
+    def return_artifacts(self, player):
+        """Возвращает артефакты игрока в хранилище"""
+        if player.artifacts:
+            self.vault.extend(player.artifacts)
+            player.artifacts.clear()
+            print(f"Артефакты игрока {player.username} возвращены в хранилище")
 
-    # Главный цикл игры
-    while True:
-        start_choice = input("\n Хотите сыграть? (да/нет): ").lower().strip()
 
-        if start_choice == "да":
-            game = AdventureGame()  # Создаем новую игру
-            game.start()           # Запускаем игру
+class Game:
+    def __init__(self):
+        self.vault = ArtifactVault()
+        self.current_player = None
+        self.players_file = "players.json"
+        self.credentials_file = "users.txt"
+        self.adventure_game = None
 
-            # Если игра завершена, выходим из цикла
-            if not game.game_active:
-                break
-        elif start_choice == "нет":
-            print("\n До свидания! Удачи на сессии!")
-            break
+    def save_credentials(self, username, password):
+        """Сохранение логина и пароля в открытом виде"""
+        with open(self.credentials_file, 'a', encoding='utf-8') as f:
+            f.write(f"{username}:{password}\n")
+
+    def check_credentials(self, username, password):
+        """Проверка логина и пароля"""
+        if not os.path.exists(self.credentials_file):
+            return False
+
+        with open(self.credentials_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                if line.strip():
+                    stored_user, stored_pass = line.strip().split(':')
+                    if stored_user == username and stored_pass == password:
+                        return True
+        return False
+
+    def save_game(self, player):
+        """Сохранение игры"""
+        if os.path.exists(self.players_file):
+            with open(self.players_file, 'r', encoding='utf-8') as f:
+                players = json.load(f)
         else:
-            print("Пожалуйста, введите 'да' или 'нет'")
+            players = {}
+
+        players[player.username] = player.to_dict()
+
+        with open(self.players_file, 'w', encoding='utf-8') as f:
+            json.dump(players, f, ensure_ascii=False, indent=2)
+        print("\n Игра сохранена!")
+
+    def load_game(self, username):
+        """Загрузка игры"""
+        if not os.path.exists(self.players_file):
+            return None
+
+        with open(self.players_file, 'r', encoding='utf-8') as f:
+            players = json.load(f)
+
+        if username in players:
+            return Player.from_dict(players[username])
+        return None
+
+    def register(self):
+        """Регистрация нового пользователя"""
+        print("\n" + "=" * 50)
+        print("РЕГИСТРАЦИЯ НОВОГО ИГРОКА")
+        print("=" * 50)
+
+        while True:
+            username = input("Придумайте логин: ").strip()
+            if not username:
+                print("Логин не может быть пустым!")
+                continue
+
+            # Проверяем, не занят ли логин
+            if os.path.exists(self.credentials_file):
+                with open(self.credentials_file, 'r', encoding='utf-8') as f:
+                    for line in f:
+                        if line.strip() and line.split(':')[0] == username:
+                            print("Этот логин уже занят!")
+                            break
+                    else:
+                        break
+            else:
+                break
+
+        password = input("Придумайте пароль: ").strip()
+        self.save_credentials(username, password)
+
+        self.current_player = Player(username)
+        print(f"\n Регистрация прошла успешно! Добро пожаловать, {username}!")
+        return self.current_player
+
+    def login(self):
+        """Вход в систему"""
+        print("\n" + "=" * 50)
+        print("ВХОД В ИГРУ")
+        print("=" * 50)
+
+        username = input("Логин: ").strip()
+        password = input("Пароль: ").strip()
+
+        if self.check_credentials(username, password):
+            # Пробуем загрузить сохраненную игру
+            player = self.load_game(username)
+            if player:
+                self.current_player = player
+                print(f"\n Успешный вход! Загружена сохраненная игра.")
+                print(f" Репутация: {player.reputation}")
+                print(f" Экзамены: {player.exams}")
+                print(f" Артефакты: {len(player.artifacts)} шт.")
+            else:
+                self.current_player = Player(username)
+                print(f"\n Успешный вход! Создан новый персонаж.")
+            return self.current_player
+        else:
+            print("\n Неверный логин или пароль!")
+            return None
+
+    def intro(self):
+        """Вступление к игре"""
+        print("\n" + "=" * 50)
+        print("ДОБРО ПОЖАЛОВАТЬ В ИГРУ!")
+        print("=" * 50)
+        print("\nВнимание! Ваша главная цель - сохранить стипендию.")
+        print("От ваших решений зависит, получите ли вы деньги на жизнь!")
+        print("\nУ вас есть:", self.current_player.lives, "попытки на пересдачу")
+        print("Текущая репутация:", self.current_player.reputation)
+        print("-" * 50)
+    
+    def retake_exam(self):
+        """Пересдача экзамена"""
+        print("\n--- ПЕРЕСДАЧА ---")
+        print("У вас осталось попыток:", self.current_player.lives)
+        
+        # Уменьшаем количество попыток
+        self.current_player.lives -= 1
+        
+        # Шанс на успешную пересдачу зависит от репутации
+        success_chance = min(0.3 + (self.current_player.reputation / 100), 0.8)
+        
+        if random.random() < success_chance:
+            print("🎉 Ура! Вы успешно пересдали!")
+            self.current_player.reputation += 10
+            return True
+        else:
+            print("💀 К сожалению, пересдача не удалась.")
+            self.current_player.reputation -= 5
+            return False
+
+    def game_loop(self):
+        """Основной игровой цикл"""
+        self.intro()
+        
+        # Создаем и запускаем приключенческую игру
+        self.adventure_game = AdventureGame()
+        
+        # Если у игрока есть сохраненные данные, переносим их
+        if self.current_player.artifacts:
+            # Копируем артефакты из сохраненной игры
+            self.adventure_game.player.artifacts = self.current_player.artifacts.copy()
+        
+        # Запускаем приключенческую игру
+        print("\n" + "=" * 50)
+        print("НАЧАЛО ПРИКЛЮЧЕНИЯ")
+        print("=" * 50)
+        self.adventure_game.start()
+        
+        # После завершения приключенческой игры обновляем данные игрока
+        self.current_player.artifacts = self.adventure_game.player.artifacts.copy()
+        self.current_player.special_artifacts_found = self.adventure_game.player.special_artifacts_found
+
+        # Показываем текущий статус
+        print("\n" + "=" * 50)
+        print("ТЕКУЩИЙ СТАТУС")
+        print("=" * 50)
+        print(f"Репутация: {self.current_player.reputation}")
+        print(f"Стипендия: {'сохранена' if self.current_player.scholarship else 'потеряна'}")
+        print(f"Экзамены: {self.current_player.exams}")
+        print(f"Артефакты: {len(self.current_player.artifacts)} шт.")
+        print(f"Попыток на пересдачу: {self.current_player.lives}")
+
+        # Предложение сохраниться
+        save_choice = input("\n Хотите сохранить игру? (да/нет): ").lower()
+        if save_choice == "да":
+            self.save_game(self.current_player)
+        else:
+            print("\n Прогресс не сохранен! Артефакты возвращаются в копилку.")
+            self.vault.return_artifacts(self.current_player)
+
+        # Проверка условий окончания игры
+        if not self.current_player.scholarship:
+            print("\n" + "=" * 20)
+            print("ИГРА ОКОНЧЕНА")
+            print("=" * 20)
+            print("\n Вы потеряли стипендию!")
+            print("Попробуйте еще раз, возможно в следующий раз повезет больше.")
+            return
+
+        # Проверка на пересдачу
+        if "не сдан" in self.current_player.exams.values() and self.current_player.lives > 0:
+            retake = input("\nХотите попробовать пересдать? (да/нет): ").lower()
+            if retake == "да":
+                if self.retake_exam():
+                    # Показываем финальный статус
+                    print("\n" + "=" * 50)
+                    print("ФИНАЛЬНЫЙ РЕЗУЛЬТАТ")
+                    print("=" * 50)
+                    print(f"Репутация: {self.current_player.reputation}")
+                    print(f"Стипендия: {'сохранена' if self.current_player.check_scholarship() else 'потеряна'}")
+                    print(f"Экзамены: {self.current_player.exams}")
+
+                    if self.current_player.scholarship:
+                        print("\n ПОЗДРАВЛЯЕМ! ВЫ СОХРАНИЛИ СТИПЕНДИЮ! ")
+                    else:
+                        print("\n Вы не смогли сохранить стипендию. Попробуйте еще раз!")
+            else:
+                print("\nВы решили не пересдавать. Игра завершена.")
+        else:
+            # Показываем финальный статус
+            print("\n" + "=" * 50)
+            print("ФИНАЛЬНЫЙ РЕЗУЛЬТАТ")
+            print("=" * 50)
+            if self.current_player.check_scholarship():
+                print("\n ПОЗДРАВЛЯЕМ! ВЫ СОХРАНИЛИ СТИПЕНДИЮ! ")
+            else:
+                print("\n Вы не смогли сохранить стипендию. Попробуйте еще раз!")
+
+    def main_menu(self):
+        """Главное меню игры"""
+        while True:
+            print("\n" + "=" * 20)
+            print("ГЛАВНОЕ МЕНЮ")
+            print("=" * 20)
+            print("1. Новая игра")
+            print("2. Загрузить игру")
+            print("3. Выход")
+
+            choice = input("\nВыберите действие: ")
+
+            if choice == "1":
+                player = self.register()
+                if player:
+                    self.game_loop()
+
+                    # Предложение сыграть еще раз
+                    again = input("\nХотите сыграть еще раз? (да/нет): ").lower()
+                    if again != "да":
+                        break
+
+            elif choice == "2":
+                player = self.login()
+                if player:
+                    self.game_loop()
+
+                    # Предложение сыграть еще раз
+                    again = input("\nХотите сыграть еще раз? (да/нет): ").lower()
+                    if again != "да":
+                        break
+
+            elif choice == "3":
+                print("\nСпасибо за игру! До свидания!")
+                break
+
+            else:
+                print("Неверный выбор. Попробуйте еще раз.")
+
+
+def main():
+    """Запуск игры"""
+    game = Game()
+    game.main_menu()
 
 
 if __name__ == "__main__":
-    main()  # Запуск игры при прямом выполнении файла
+    main()
